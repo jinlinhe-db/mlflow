@@ -18,7 +18,6 @@ from mlflow.utils.environment import (
     _mlflow_additional_pip_env,
 )
 from mlflow.exceptions import MlflowException
-from mlflow.environment_variables import MLFLOW_WHEELED_MODEL_PIP_DOWNLOAD_OPTIONS
 from mlflow.protos.databricks_pb2 import BAD_REQUEST
 from mlflow.utils.model_utils import _validate_and_prepare_target_save_path
 from mlflow.utils.uri import get_databricks_profile_uri_from_artifact_uri
@@ -37,16 +36,17 @@ class WheeledModel:
         This utility only operates on a model that has been registered to the Model Registry.
     """
 
-    def __init__(self, model_uri):
+    def __init__(self, model_uri, pip_wheel_download_option):
         self._model_uri = model_uri
         databricks_profile_uri = (
             get_databricks_profile_uri_from_artifact_uri(model_uri) or mlflow.get_registry_uri()
         )
         client = MlflowClient(registry_uri=databricks_profile_uri)
         self._model_name, _ = get_model_name_and_version(client, model_uri)
+        self.pip_wheel_download_option = pip_wheel_download_option
 
     @classmethod
-    def log_model(cls, model_uri, registered_model_name=None):
+    def log_model(cls, model_uri, registered_model_name=None, pip_wheel_download_option=''):
         """
         Logs a registered model as an MLflow artifact for the current run. This only operates on
         a model which has been registered to the Model Registry. Given a registered model_uri (
@@ -76,7 +76,7 @@ class WheeledModel:
         parsed_uri = _parse_model_uri(model_uri)
         return Model.log(
             artifact_path=None,
-            flavor=WheeledModel(model_uri),
+            flavor=WheeledModel(model_uri, pip_wheel_download_option),
             registered_model_name=registered_model_name or parsed_uri.name,
         )
 
@@ -125,7 +125,9 @@ class WheeledModel:
             self._create_pip_requirement(conda_env_path, pip_requirements_path)
 
         WheeledModel._download_wheels(
-            pip_requirements_path=pip_requirements_path, dst_path=wheels_dir
+            pip_requirements_path=pip_requirements_path, 
+            dst_path=wheels_dir,
+            pip_wheel_download_option=self.pip_wheel_download_option
         )
 
         # Keep a copy of the original requirement.txt
@@ -198,7 +200,7 @@ class WheeledModel:
         return mlflow_model
 
     @classmethod
-    def _download_wheels(cls, pip_requirements_path, dst_path):
+    def _download_wheels(cls, pip_requirements_path, dst_path, pip_wheel_download_option):
         """
         Downloads all the wheels of the dependencies specified in the requirements.txt file.
         The pip wheel download_command defaults to downloading only binary packages using
@@ -211,10 +213,8 @@ class WheeledModel:
         if not os.path.exists(dst_path):
             os.makedirs(dst_path)
 
-        pip_wheel_options = MLFLOW_WHEELED_MODEL_PIP_DOWNLOAD_OPTIONS.get()
-
         download_command = (
-            f"{sys.executable} -m pip wheel {pip_wheel_options} --wheel-dir={dst_path} -r"
+            f"{sys.executable} -m pip wheel {pip_wheel_download_option} --wheel-dir={dst_path} -r"
             f"{pip_requirements_path} --no-cache-dir"
         )
 

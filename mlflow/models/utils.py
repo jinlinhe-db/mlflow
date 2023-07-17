@@ -785,7 +785,7 @@ def validate_schema(data: PyFuncInput, expected_schema: Schema) -> None:
 
 
 @experimental
-def add_libraries_to_model(model_uri, run_id=None, registered_model_name=None):
+def add_libraries_to_model(model_uri, run_id=None, registered_model_name=None, pip_wheel_download_option=''):
     """
     Given a registered model_uri (e.g. models:/<model_name>/<model_version>), this utility
     re-logs the model along with all the required model libraries back to the Model Registry.
@@ -864,9 +864,9 @@ def add_libraries_to_model(model_uri, run_id=None, registered_model_name=None):
         if run_id is None:
             run_id = get_model_version_from_model_uri(model_uri).run_id
         with mlflow.start_run(run_id):
-            return WheeledModel.log_model(model_uri, registered_model_name)
+            return WheeledModel.log_model(model_uri, registered_model_name, pip_wheel_download_option)
     else:
-        return WheeledModel.log_model(model_uri, registered_model_name)
+        return WheeledModel.log_model(model_uri, registered_model_name, pip_wheel_download_option)
 
 
 def get_model_version_from_model_uri(model_uri):
